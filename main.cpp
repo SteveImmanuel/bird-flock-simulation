@@ -8,7 +8,7 @@
 #define FALSE 0
 #define TRUE 1
 
-#include "Angel.h"
+#include "include/Angel.h"
 #include <GL/glew.h>
 
 typedef Angel::vec4 point4;
@@ -125,7 +125,7 @@ void init(void) {
     glBufferSubData(GL_ARRAY_BUFFER, sizeof(points), sizeof(point_colors), point_colors);
 
     // Load shaders and use the resulting shader program
-    GLuint program = InitShader("vshader91.glsl", "fshader91.glsl");
+    GLuint program = InitShader("shader/vshader91.glsl", "shader/fshader91.glsl");
     glUseProgram(program);
 
     // set up vertex arrays
