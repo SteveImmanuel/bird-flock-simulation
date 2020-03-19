@@ -1,7 +1,7 @@
 /* Particles in a box */
 
 #define MAX_NUM_PARTICLES 1000
-#define INITIAL_NUM_PARTICLES 25
+#define INITIAL_NUM_PARTICLES 100
 #define INITIAL_POINT_SIZE 5.0
 #define INITIAL_SPEED 0.01
 #define NUM_COLORS 8
@@ -355,7 +355,7 @@ int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(800, 800);
-    glutCreateWindow("particle system");
+    glutCreateWindow("Bird Flock Simulation by Steve Immanuel");
     glutCreateMenu(menu);
     glutAddMenuEntry("more particles", 1);
     glutAddMenuEntry("fewer particles", 2);
