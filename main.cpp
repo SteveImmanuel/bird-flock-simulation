@@ -1,15 +1,16 @@
 /* Particles in a box */
 
 #define MAX_NUM_PARTICLES 1000
-#define INITIAL_NUM_PARTICLES 250
+#define INITIAL_NUM_PARTICLES 25
 #define INITIAL_POINT_SIZE 5.0
 #define INITIAL_SPEED 1.0
 #define NUM_COLORS 8
 #define FALSE 0
 #define TRUE 1
 
-#include "include/Angel.h"
 #include <GL/glew.h>
+
+#include "include/Angel.h"
 
 typedef Angel::vec4 point4;
 typedef Angel::vec4 color4;
@@ -62,7 +63,6 @@ float point_size = INITIAL_POINT_SIZE;
 float speed = INITIAL_SPEED;
 bool gravity = FALSE;                           /* gravity off */
 bool elastic = FALSE;                           /* restitution off */
-bool repulsion = FALSE;                         /* repulsion off */
 float coef = 1.0;                               /* perfectly elastic collisions */
 float d2[MAX_NUM_PARTICLES][MAX_NUM_PARTICLES]; /* array for interparticle distances */
 
@@ -97,10 +97,8 @@ void colorcube() {
 }
 
 //----------------------------------------------------------------------------
-
-void init(void) {
+void initParticle() {
     colorcube();
-    std::cout << "setup particle" << std::endl;
     /* set up particles with random locations and velocities */
     for (int i = 0; i < num_particles; i++) {
         particles[i].mass = 1.0;
@@ -111,7 +109,10 @@ void init(void) {
         }
         particles[i].position[3] = 1.0;
     }
+    glPointSize(point_size);
+}
 
+void init(void) {
     // Create a vertex array object
     GLuint vao;
     glGenVertexArrays(1, &vao);
@@ -141,7 +142,6 @@ void init(void) {
     projection_loc = glGetUniformLocation(program, "Projection");
 
     glClearColor(0.5, 0.5, 0.5, 1.0);
-    glPointSize(point_size);
 }
 
 //----------------------------------------------------------------------------
@@ -149,13 +149,12 @@ void init(void) {
 float forces(int i, int j) {
     int k;
     float force = 0.0;
-    if (gravity && j == 1) force = -1.0; /* simple gravity */
-    if (repulsion)
-        for (k = 0; k < num_particles; k++) { /* repulsive force */
-            if (k != i)
-                force += 0.001 * (particles[i].position[j] - particles[k].position[j]) /
-                         (0.001 + d2[i][k]);
-        }
+    if (gravity && j == 1) force = -1.0;  /* simple gravity */
+    for (k = 0; k < num_particles; k++) { /* repulsive force */
+        if (k != i)
+            force +=
+                0.001 * (particles[i].position[j] - particles[k].position[j]) / (0.001 + d2[i][k]);
+    }
     return (force);
 }
 
@@ -179,28 +178,35 @@ void collision(int n)
 }
 
 //----------------------------------------------------------------------------
+void updatePosition() {
+    float dt = 0.001 * (present_time - last_time);
 
-void idle(void) {
-    int i, j, k;
-    float dt;
-    present_time = glutGet(GLUT_ELAPSED_TIME);
-    dt = 0.001 * (present_time - last_time);
-    for (i = 0; i < num_particles; i++) {
-        for (j = 0; j < 3; j++) {
+    for (int i = 0; i < num_particles; i++) {
+        for (int j = 0; j < 3; j++) {
             particles[i].position[j] += dt * particles[i].velocity[j];
             particles[i].velocity[j] += dt * forces(i, j) / particles[i].mass;
         }
         collision(i);
     }
-    if (repulsion)
-        for (i = 0; i < num_particles; i++)
-            for (k = 0; k < i; k++) {
-                d2[i][k] = 0.0;
-                for (j = 0; j < 3; j++)
-                    d2[i][k] += (particles[i].position[j] - particles[k].position[j]) *
-                                (particles[i].position[j] - particles[k].position[j]);
-                d2[k][i] = d2[i][k];
+}
+
+void updateDistance() {
+    for (int i = 0; i < num_particles; i++) {
+        for (int k = 0; k < i; k++) {
+            d2[i][k] = 0.0;
+            for (int j = 0; j < 3; j++) {
+                d2[i][k] += (particles[i].position[j] - particles[k].position[j]) *
+                            (particles[i].position[j] - particles[k].position[j]);
             }
+            d2[k][i] = d2[i][k];
+        }
+    }
+}
+
+void idle(void) {
+    present_time = glutGet(GLUT_ELAPSED_TIME);
+    updateDistance();
+    updatePosition();
     last_time = present_time;
     glutPostRedisplay();
 }
@@ -244,17 +250,11 @@ void menu(int option) {
             break;
 
         case 9:
-            repulsion = !repulsion;
-            break;
-
-        case 10:
             exit(EXIT_SUCCESS);
             break;
     }
 
-    glewInit();
-    init();
-
+    initParticle();
     glutPostRedisplay();
 }
 
@@ -265,7 +265,6 @@ void display(void) {
 
     for (int i = 0; i < num_particles; i++) {
         point_colors[i + 24] = vertex_colors[particles[i].color];
-        // particles[i].position[3] = 1.0;
         points[i + 24] = particles[i].position;
     }
 
@@ -297,7 +296,7 @@ void reshape(int width, int height) {
 int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-    glutInitWindowSize(512, 512);
+    glutInitWindowSize(800, 800);
     glutCreateWindow("particle system");
     glutCreateMenu(menu);
     glutAddMenuEntry("more particles", 1);
@@ -308,15 +307,14 @@ int main(int argc, char **argv) {
     glutAddMenuEntry("smaller particles", 6);
     glutAddMenuEntry("toggle gravity", 7);
     glutAddMenuEntry("toggle restitution", 8);
-    glutAddMenuEntry("toggle repulsion", 9);
-    glutAddMenuEntry("quit", 10);
+    glutAddMenuEntry("quit", 9);
     glutAttachMenu(GLUT_RIGHT_BUTTON);
     glewInit();
+    initParticle();
     init();
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutIdleFunc(idle);
-
     glutMainLoop();
     return 0;
 }
