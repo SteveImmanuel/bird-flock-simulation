@@ -60,8 +60,6 @@ particle particles[MAX_NUM_PARTICLES]; /* particle system */
 
 /* initial state of particle system */
 
-int present_time;
-int last_time;
 int num_particles = INITIAL_NUM_PARTICLES;
 float point_size = INITIAL_POINT_SIZE;
 float speed = INITIAL_SPEED;
@@ -152,33 +150,7 @@ void init(void) {
 
 //----------------------------------------------------------------------------
 
-vec4 forces(int i) {
-    vec4 force;
-    vec4 avg_speed;
-    int total_neighbor = 0;
-
-    force.z = 1.0;
-    // gravity
-    if (gravity) force.y = -1.0;
-
-    for (int k = 0; k < num_particles; k++) {
-        if (k != i) {
-            // repulsive
-            force += 0.001 * (particles[i].position - particles[k].position) / (0.001 + d2[i][k]);
-            if (length(particles[i].position - particles[k].position) <= PERCEPTION) {
-                avg_speed += particles[k].velocity;
-                total_neighbor += 1;
-            }
-        }
-    }
-
-    return (force);
-}
-
-//----------------------------------------------------------------------------
-
 void collision(int n)
-
 /* tests for collisions against cube and reflect particles if necessary */
 {
     int i;
@@ -263,7 +235,6 @@ void updateDistance() {
 }
 
 void idle(void) {
-    present_time = glutGet(GLUT_ELAPSED_TIME);
     updateDistance();
     updatePosition();
     glutPostRedisplay();
