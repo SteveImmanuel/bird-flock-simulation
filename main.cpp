@@ -3,8 +3,9 @@
 #define MAX_NUM_PARTICLES 1000
 #define INITIAL_NUM_PARTICLES 25
 #define INITIAL_POINT_SIZE 5.0
-#define INITIAL_SPEED 1.0
+#define INITIAL_SPEED 0.01
 #define NUM_COLORS 8
+#define PERCEPTION 0.2
 #define FALSE 0
 #define TRUE 1
 
@@ -43,12 +44,15 @@ GLuint buffer;
 GLuint loc, loc2;
 GLint model_view_loc, projection_loc;
 
+vec4 clamp(vec4 velocity);
+
 /* particle struct */
 
 typedef struct particle {
     int color;
     point4 position;
     vec4 velocity;
+    vec4 acceleration;
     float mass;
 } particle;
 
@@ -106,7 +110,9 @@ void initParticle() {
         for (int j = 0; j < 3; j++) {
             particles[i].position[j] = 2.0 * ((float)rand() / RAND_MAX) - 1.0;
             particles[i].velocity[j] = speed * 2.0 * ((float)rand() / RAND_MAX) - 1.0;
+            particles[i].acceleration[j] = 0;
         }
+        particles[i].velocity = clamp(particles[i].velocity);
         particles[i].position[3] = 1.0;
     }
     glPointSize(point_size);
@@ -146,15 +152,26 @@ void init(void) {
 
 //----------------------------------------------------------------------------
 
-float forces(int i, int j) {
-    int k;
-    float force = 0.0;
-    if (gravity && j == 1) force = -1.0;  /* simple gravity */
-    for (k = 0; k < num_particles; k++) { /* repulsive force */
-        if (k != i)
-            force +=
-                0.001 * (particles[i].position[j] - particles[k].position[j]) / (0.001 + d2[i][k]);
+vec4 forces(int i) {
+    vec4 force;
+    vec4 avg_speed;
+    int total_neighbor = 0;
+
+    force.z = 1.0;
+    // gravity
+    if (gravity) force.y = -1.0;
+
+    for (int k = 0; k < num_particles; k++) {
+        if (k != i) {
+            // repulsive
+            force += 0.001 * (particles[i].position - particles[k].position) / (0.001 + d2[i][k]);
+            if (length(particles[i].position - particles[k].position) <= PERCEPTION) {
+                avg_speed += particles[k].velocity;
+                total_neighbor += 1;
+            }
+        }
     }
+
     return (force);
 }
 
@@ -177,15 +194,57 @@ void collision(int n)
     }
 }
 
+vec4 clamp(vec4 velocity) {
+    if (length(velocity) > speed) {
+        return normalize(velocity) * speed;
+    }
+    return velocity;
+}
+
+vec4 getDirection(int i) {
+    vec4 steering = 0;
+    vec4 avg_speed;
+    vec4 center_mass;
+    int total_neighbor = 0;
+
+    for (int k = 0; k < num_particles; k++) {
+        if (length(particles[i].position - particles[k].position) <= PERCEPTION) {
+            //apply separation
+            steering += 0.01 * (particles[i].position - particles[k].position) / (0.01 + d2[i][k]);
+            
+            avg_speed += particles[k].velocity;
+            center_mass += particles[k].position;
+            total_neighbor += 1;
+        }
+    }
+
+    if (total_neighbor > 1) {
+        // apply alignment
+        avg_speed /= total_neighbor;
+        avg_speed = normalize(avg_speed);
+        steering += avg_speed - particles[i].velocity;
+
+        // apply cohesion
+        center_mass /= total_neighbor;
+        vec4 vector_to_center_mass = center_mass - particles[i].position;
+        vector_to_center_mass = normalize(vector_to_center_mass) * 0.1;
+        steering += vector_to_center_mass - particles[i].velocity;
+
+        steering = normalize(steering);
+    }
+
+    return steering;
+}
+
 //----------------------------------------------------------------------------
 void updatePosition() {
-    float dt = 0.001 * (present_time - last_time);
-
     for (int i = 0; i < num_particles; i++) {
-        for (int j = 0; j < 3; j++) {
-            particles[i].position[j] += dt * particles[i].velocity[j];
-            particles[i].velocity[j] += dt * forces(i, j) / particles[i].mass;
-        }
+        particles[i].acceleration += getDirection(i);
+        particles[i].position += particles[i].velocity;
+        particles[i].velocity += particles[i].acceleration;
+        particles[i].velocity = clamp(particles[i].velocity);
+
+        particles[i].acceleration = 0;
         collision(i);
     }
 }
@@ -207,7 +266,6 @@ void idle(void) {
     present_time = glutGet(GLUT_ELAPSED_TIME);
     updateDistance();
     updatePosition();
-    last_time = present_time;
     glutPostRedisplay();
 }
 
